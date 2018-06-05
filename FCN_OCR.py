@@ -7,7 +7,6 @@ import datetime
 import Batch_manager_5channels as dataset
 import data_reader_5channels as reader
 import tensor_utils_5_channels as utils
-from infer_imagenet_resnet_101_5chan_v3 import resnet101_net
 from sys import argv
 from os.path import join
 
@@ -23,6 +22,36 @@ tf.flags.DEFINE_string('mode', "train", "Mode train/ test/ visualize")
 MAX_ITERATION = int(153600 + 1) # 25 epochs
 NUM_OF_CLASSES = 2
 IMAGE_SIZE = 32
+
+def conv_bn_relu(current, no_1, no_2, in_channels, out_channels, keep_prob, is_training):
+    init = tf.contrib.layers.xavier_initializer()
+    filters = tf.get_variable(name='conv' + str(no_1) + '_' + str(no_2) + '_' + 'W',
+                              initializer=init,
+                              shape=(32 / no_1, 32 / no_1, in_channels, out_channels))
+    bias = tf.get_variable(name='conv' + str(no_1) + '_' + str(no_2) + '_' + 'b',
+                           initializer=init,
+                           shape=(out_channels))
+    current = tf.nn.bias_add(tf.nn.conv2d(current, filters, strides=[1, 1, 1, 1], padding="SAME"), bias)
+    
+    batch_mean, batch_var = tf.nn.moments(current, [0, 1, 2], name='batch_moments')
+    decay = 0.9
+    ema = tf.train.ExponentialMovingAverage(decay=decay)
+    mean = 
+    def mean_var_with_update():
+        ema_apply_op = ema.apply([batch_mean, batch_var])
+        with tf.control_dependencies([ema_apply_op]):
+            return tf.identity(batch_mean), tf.identity(batch_var)
+    mean, variance = tf.cond(is_training, mean_var_with_update, lambda: (ema.average(batch_mean), ema.average(batch_var)))
+    current = tf.nn.batch_normalization(current, mean, variance, offset, scale, 1e-5, name=layer_names[1])
+
+    return current
+
+def net(normalised_img, keep_prob, is_training):
+    net = {}
+    current = normalised_img
+    current = conv_bn_relu(current, 1, 1, 3, 1, keep_prob, is_training)
+    net['pool1'] = current
+    return net
 
 def inference(image, keep_prob, is_training):
     """
@@ -45,7 +74,7 @@ def inference(image, keep_prob, is_training):
     normalised_img = utils.process_image(image, mean_pixel)
 
     with tf.variable_scope("inference"):
-        net = resnet101_net(normalised_img, weights, keep_prob, is_training)
+        net = net(normalised_img, keep_prob, is_training)
         last_layer = net["res5c_relu"]
 
         fc_filter = utils.weight_variable([1, 1, 2048, NUM_OF_CLASSES], name="fc_filter")
