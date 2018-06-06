@@ -11,16 +11,15 @@ input_img_dir = "../FCN_OCR_dataset/input_img"
 annotation_dir = "../FCN_OCR_dataset/annotations"
 
 CROP_SIZE = 32
-files = listdir(annotation_dir)
-validation_image = files[int(len(files) * 0.8):]
-
+validation_image = ["841289701567_01267729233_023245368_1_2015122120241757.png",
+                    "841289701567_01267729233_023245368_1_2015122120241757 (copy).png"]
 
 def create_training_dataset():
     if not exists(training_dir):
         mkdir(training_dir)
     if not exists(gt_dir):
         mkdir(gt_dir)
-    for filename in files:
+    for filename in listdir(annotation_dir):
         if filename in validation_image:
             continue
         input_image = imread(join(input_img_dir, filename))

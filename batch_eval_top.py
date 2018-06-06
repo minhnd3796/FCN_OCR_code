@@ -1,7 +1,7 @@
 from cv2 import imread, imwrite
 import numpy as np
 from os.path import join, exists
-from os import mkdir
+from os import mkdir, listdir
 from sys import argv
 from PIL import Image
 
@@ -18,8 +18,7 @@ def create_patch_batch_list(filename,
     top_dir = join(data_dir, 'input_img')
     global_patch_index = 0
 
-    top_img = imread(join(top_dir, filename + '.png'))
-    print(join(top_dir, filename + '.png'))
+    top_img = imread(join(top_dir, filename))
     height = top_img.shape[0]
     width = top_img.shape[1]
     num_vertical_points = (height - patch_size) // vertical_stride + 1
@@ -161,36 +160,26 @@ def eval_dir(input_tensor,
              vertical_stride=16,
              horizontal_stride=16,
              is_validation=True):
+    files = listdir("../FCN_OCR_dataset/annotations")
     if is_validation:
-        filename = ['841289701567_01267729233_023245368_1_2015122120241757']
+        filename = files[:int(len(files) * 0.8)]
         acc_logfile = 'epoch_val_acc.csv'
     else:
-        filename = ['841289701567_01228925773_045189969_1_2016022410243412',
-                    '841289701567_0938111809_025286869_1_2016012120241053',
-                    '841289701567_01267152429_212753992_1_2015121513240304',
-                    '841289701567_01268644208_351359039_1_2016022712245626']
-
-        # For submission only
-        """ filename = ['top_mosaic_09cm_area1', 'top_mosaic_09cm_area3', 'top_mosaic_09cm_area5',
-                    'top_mosaic_09cm_area11', 'top_mosaic_09cm_area13', 'top_mosaic_09cm_area15',
-                    'top_mosaic_09cm_area21', 'top_mosaic_09cm_area26', 'top_mosaic_09cm_area28',
-                    'top_mosaic_09cm_area30', 'top_mosaic_09cm_area32', 'top_mosaic_09cm_area34',
-                    'top_mosaic_09cm_area7', 'top_mosaic_09cm_area17', 'top_mosaic_09cm_area23',
-                    'top_mosaic_09cm_area37'] """
+        filename = files[int(len(files) * 0.8):]
         acc_logfile = 'epoch_train_acc.csv'
     num_matches = 0
     num_pixels = 0
     for fn in filename:
         input_batch_list, coordinate_batch_list, height, width = create_patch_batch_list(fn, batch_size, num_channels=num_channels)
         pred_annotation_map = batch_inference(input_tensor, logits, keep_probability, encoding_keep_prob, sess, is_training, input_batch_list, coordinate_batch_list, height, width)
-        num_matches += np.sum(pred_annotation_map == imread("../FCN_OCR_dataset/annotations/" + fn + ".png", -1))
+        num_matches += np.sum(pred_annotation_map == imread("../FCN_OCR_dataset/annotations/" + fn, -1))
         num_pixels += pred_annotation_map.shape[0] * pred_annotation_map.shape[1]
     with open(join(log_dir, acc_logfile), 'a') as f:
         f.write(str(epoch_num) + ',' + str(num_matches / num_pixels) + '\n')
 
 def get_patches(image_name, patch_size=32, vertical_stride=16, horizontal_stride=16):
     input_img = imread("../FCN_OCR_dataset/top/" + image_name + ".png")
-    annotation_img = imread("../FCN_OCR_dataset/annotations/" + image_name + '.png', -1)
+    annotation_img = imread("../FCN_OCR_dataset/annotations/" + image_name, -1)
     height = np.shape(input_img)[0]
     width = np.shape(input_img)[1]
     number_of_vertical_points = (height - patch_size) // vertical_stride + 1
