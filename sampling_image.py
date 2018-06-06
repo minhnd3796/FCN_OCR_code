@@ -62,7 +62,7 @@ def create_validation_dataset():
                 print((x, y))
                 i += 1
                 input_image_cropped = input_image[x:x + CROP_SIZE, y:y + CROP_SIZE, :]
-                imwrite(join(training_dir, splitext(filename)[0] + "_" + str(i) + ".png"), input_image_cropped)
+                imwrite(join(validation_dir, splitext(filename)[0] + "_" + str(i) + ".png"), input_image_cropped)
                 annotation_image_cropped = annotation_image[x:x + CROP_SIZE, y:y + CROP_SIZE]
                 imwrite(join(gt_dir,splitext(filename)[0] + "_" + str(i) + ".png"), annotation_image_cropped)
                 y += STRIDE
@@ -71,5 +71,5 @@ def create_validation_dataset():
 
 if __name__=="__main__":
     np.random.seed(3796)
-    # create_training_dataset()
+    create_training_dataset()
     create_validation_dataset()
