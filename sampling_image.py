@@ -71,5 +71,5 @@ def create_validation_dataset():
 
 if __name__=="__main__":
     np.random.seed(3796)
-    create_training_dataset()
+    # create_training_dataset()
     create_validation_dataset()

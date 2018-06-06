@@ -11,7 +11,7 @@ from sys import argv
 from os.path import join
 
 FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_integer("batch_size", "2048", "batch size for training")
+tf.flags.DEFINE_integer("batch_size", "32", "batch size for training")
 tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR/", "path to logs directory")
 tf.flags.DEFINE_string("data_dir", "../FCN_OCR_dataset", "path to dataset")
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
@@ -48,19 +48,19 @@ def encoding_net(normalised_img, keep_prob, is_training):
     net = {}
     current = normalised_img
 
-    current = conv_bn_relu(current, 1, 1, 3, 1, keep_prob, is_training)
+    current = conv_bn_relu(current, 1, 1, 3, 32, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net['pool1'] = current
 
-    current = conv_bn_relu(current, 2, 1, 1, 1, keep_prob, is_training)
+    current = conv_bn_relu(current, 2, 1, 32, 64, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net['pool2'] = current
 
-    current = conv_bn_relu(current, 3, 1, 1, 1, keep_prob, is_training)
+    current = conv_bn_relu(current, 3, 1, 64, 128, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net['pool3'] = current
 
-    current = conv_bn_relu(current, 4, 1, 1, 1, keep_prob, is_training)
+    current = conv_bn_relu(current, 4, 1, 128, 256, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net['pool4'] = current
     return net
@@ -78,7 +78,7 @@ def inference(image, keep_prob, is_training):
         net = encoding_net(normalised_img, keep_prob, is_training)
         last_layer = net["pool4"]
 
-        fc_filter = utils.weight_variable([1, 1, 1, NUM_OF_CLASSES], name="fc_filter")
+        fc_filter = utils.weight_variable([1, 1, 256, NUM_OF_CLASSES], name="fc_filter")
         fc_bias = utils.bias_variable([NUM_OF_CLASSES], name="fc_bias")
         fc = tf.nn.bias_add(tf.nn.conv2d(last_layer, fc_filter, strides=[1, 1, 1, 1], padding="SAME"), fc_bias, name='fc')
 
