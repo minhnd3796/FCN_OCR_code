@@ -11,11 +11,10 @@ from sys import argv
 from os.path import join
 
 FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_integer("batch_size", "32", "batch size for training")
-tf.flags.DEFINE_string("logs_dir", "../logs-FCN-8s-ResNet101-5c-v3.0/", "path to logs directory")
-tf.flags.DEFINE_string("data_dir", "../ISPRS_semantic_labeling_Vaihingen", "path to dataset")
+tf.flags.DEFINE_integer("batch_size", "128", "batch size for training")
+tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR/", "path to logs directory")
+tf.flags.DEFINE_string("data_dir", "../FCN_OCR_dataset", "path to dataset")
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
-tf.flags.DEFINE_string("model_dir", "../pretrained_models/imagenet-resnet-101-dag.mat", "Path to model mat")
 tf.flags.DEFINE_bool('debug', "False", "Debug mode: True/ False")
 tf.flags.DEFINE_string('mode', "train", "Mode train/ test/ visualize")
 
@@ -23,17 +22,15 @@ MAX_ITERATION = int(153600 + 1) # 25 epochs
 NUM_OF_CLASSES = 2
 IMAGE_SIZE = 32
 
+init = tf.contrib.layers.xavier_initializer()
 def conv_bn_relu(current, no_1, no_2, in_channels, out_channels, keep_prob, is_training):
-    init = tf.contrib.layers.xavier_initializer()
     filters = tf.get_variable(name='conv' + str(no_1) + '_' + str(no_2) + '_' + 'W',
-                              initializer=init,
-                              shape=(32 / no_1, 32 / no_1, in_channels, out_channels))
+                              initializer=init, shape=(3, 3, in_channels, out_channels))
     bias = tf.get_variable(name='conv' + str(no_1) + '_' + str(no_2) + '_' + 'b',
-                           initializer=init,
-                           shape=(out_channels))
+                           initializer=init, shape=(out_channels))
     current = tf.nn.bias_add(tf.nn.conv2d(current, filters, strides=[1, 1, 1, 1], padding="SAME"), bias)
     
-    batch_mean, batch_var = tf.nn.moments(current, [0, 1, 2], name='batch_moments')
+    """ batch_mean, batch_var = tf.nn.moments(current, [0, 1, 2], name='batch_moments')
     decay = 0.9
     ema = tf.train.ExponentialMovingAverage(decay=decay)
     mean = 
@@ -42,29 +39,33 @@ def conv_bn_relu(current, no_1, no_2, in_channels, out_channels, keep_prob, is_t
         with tf.control_dependencies([ema_apply_op]):
             return tf.identity(batch_mean), tf.identity(batch_var)
     mean, variance = tf.cond(is_training, mean_var_with_update, lambda: (ema.average(batch_mean), ema.average(batch_var)))
-    current = tf.nn.batch_normalization(current, mean, variance, offset, scale, 1e-5, name=layer_names[1])
+    current = tf.nn.batch_normalization(current, mean, variance, offset, scale, 1e-5, name=layer_names[1]) """
+    current = tf.nn.relu(current)
 
     return current
 
-def net(normalised_img, keep_prob, is_training):
+def encoding_net(normalised_img, keep_prob, is_training):
     net = {}
     current = normalised_img
+
     current = conv_bn_relu(current, 1, 1, 3, 1, keep_prob, is_training)
+    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net['pool1'] = current
+
+    current = conv_bn_relu(current, 2, 1, 1, 1, keep_prob, is_training)
+    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
+    net['pool2'] = current
+
+    current = conv_bn_relu(current, 3, 1, 1, 1, keep_prob, is_training)
+    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
+    net['pool3'] = current
+
+    current = conv_bn_relu(current, 4, 1, 1, 1, keep_prob, is_training)
+    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
+    net['pool4'] = current
     return net
 
 def inference(image, keep_prob, is_training):
-    """
-    Semantic segmentation network definition
-    :param image: input image. Should have values in range 0-255
-    :param keep_prob:
-    :return:
-    """
-    print(">> Setting up resnet-101 pretrained layers ...")
-
-    resnet101_model = utils.get_model_data(FLAGS.model_dir)
-    weights = np.squeeze(resnet101_model['params'])
-
     mean_pixel = np.zeros((IMAGE_SIZE, IMAGE_SIZE, 3))
     mean_pixel[:, :, 0] = np.ones((IMAGE_SIZE, IMAGE_SIZE)) * 135.21788372620313
     mean_pixel[:, :, 1] = np.ones((IMAGE_SIZE, IMAGE_SIZE)) * 145.12055858608417
@@ -74,15 +75,21 @@ def inference(image, keep_prob, is_training):
     normalised_img = utils.process_image(image, mean_pixel)
 
     with tf.variable_scope("inference"):
-        net = net(normalised_img, keep_prob, is_training)
-        last_layer = net["res5c_relu"]
+        net = encoding_net(normalised_img, keep_prob, is_training)
+        last_layer = net["pool4"]
 
-        fc_filter = utils.weight_variable([1, 1, 2048, NUM_OF_CLASSES], name="fc_filter")
+        fc_filter = utils.weight_variable([1, 1, 1, NUM_OF_CLASSES], name="fc_filter")
         fc_bias = utils.bias_variable([NUM_OF_CLASSES], name="fc_bias")
         fc = tf.nn.bias_add(tf.nn.conv2d(last_layer, fc_filter, strides=[1, 1, 1, 1], padding="SAME"), fc_bias, name='fc')
 
         # now to upscale to actual image size
-        deconv_shape1 = net["res4b22_relu"].get_shape()
+        shape = tf.shape(image)
+        deconv_shape3 = tf.stack([shape[0], shape[1], shape[2], NUM_OF_CLASSES])
+        W_t3 = tf.get_variable(name='deconv_W', initializer=init, shape=(32, 32, NUM_OF_CLASSES, NUM_OF_CLASSES))
+        b_t3 = tf.get_variable(name='deconv_b', initializer=init, shape=(NUM_OF_CLASSES))
+        conv_t3 = utils.conv2d_transpose_strided(fc, W_t3, b_t3, output_shape=deconv_shape3, stride=16)
+
+        """ deconv_shape1 = net["res4b22_relu"].get_shape()
         W_t1 = utils.weight_variable([4, 4, deconv_shape1[3].value, NUM_OF_CLASSES], name="W_t1")
         b_t1 = utils.bias_variable([deconv_shape1[3].value], name="b_t1")
         conv_t1 = utils.conv2d_transpose_strided(fc, W_t1, b_t1, output_shape=tf.shape(net["res4b22_relu"]))
@@ -98,11 +105,11 @@ def inference(image, keep_prob, is_training):
         deconv_shape3 = tf.stack([shape[0], shape[1], shape[2], NUM_OF_CLASSES])
         W_t3 = utils.weight_variable([16, 16, NUM_OF_CLASSES, deconv_shape2[3].value], name="W_t3")
         b_t3 = utils.bias_variable([NUM_OF_CLASSES], name="b_t3")
-        conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
+        conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8) """
 
         annotation_pred = tf.argmax(conv_t3, axis=3, name="prediction")
 
-    return tf.expand_dims(annotation_pred, dim=3), conv_t3
+    return tf.expand_dims(annotation_pred, dim=3), conv_t3, net
 
 def train(loss_val, var_list):
     optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
@@ -129,7 +136,7 @@ def build_session(cuda_device):
     image = tf.placeholder(tf.float32, shape=[None, IMAGE_SIZE, IMAGE_SIZE, 3], name="input_image")
     annotation = tf.placeholder(tf.int32, shape=[None, IMAGE_SIZE, IMAGE_SIZE, 1], name="annotation")
     is_training = tf.placeholder(tf.bool, name="is_training")
-    pred_annotation, logits = inference(image, keep_probability, is_training)
+    pred_annotation, logits, net = inference(image, keep_probability, is_training)
     annotation_64 = tf.cast(annotation, dtype=tf.int64)
     # calculate accuracy for batch.
     cal_acc = tf.equal(pred_annotation, annotation_64)
@@ -169,14 +176,14 @@ def build_session(cuda_device):
     if ckpt and ckpt.model_checkpoint_path:
         saver.restore(sess, ckpt.model_checkpoint_path)
         print("Model restored...")
-    return image, logits, is_training, keep_probability, sess, annotation, train_op, loss, acc, loss_summary, acc_summary, saver, pred_annotation, train_writer, validation_writer
+    return net, image, logits, is_training, keep_probability, sess, annotation, train_op, loss, acc, loss_summary, acc_summary, saver, pred_annotation, train_writer, validation_writer
 
 def main(argv=None):
     np.random.seed(3796)
-    image, logits, is_training, keep_probability, sess, annotation, train_op, loss, acc, loss_summary, acc_summary, saver, pred_annotation, train_writer, validation_writer = build_session(argv[1])
+    net, image, logits, is_training, keep_probability, sess, annotation, train_op, loss, acc, loss_summary, acc_summary, saver, pred_annotation, train_writer, validation_writer = build_session(argv[1])
 
     print("Setting up image reader...")
-    train_records, valid_records = reader.read_dataset_test(FLAGS.data_dir)
+    train_records, valid_records = reader.read_dataset_OCR(FLAGS.data_dir)
     print(len(train_records))
     print(len(valid_records))
 
@@ -233,7 +240,14 @@ def main(argv=None):
             train_images, train_annotations = train_dataset_reader.next_batch(saver, FLAGS.batch_size, image, logits, keep_probability, sess, is_training, FLAGS.logs_dir)
             feed_dict = {image: train_images, annotation: train_annotations, keep_probability: 1.0, is_training: True}
             tf.set_random_seed(3796 + itr) # get deterministicly random dropouts
+            """ print('input_tensor:', sess.run(tf.shape(image), feed_dict=feed_dict))
+            print('pool1:', sess.run(tf.shape(net['pool1']), feed_dict=feed_dict))
+            print('pool2:', sess.run(tf.shape(net['pool2']), feed_dict=feed_dict))
+            print('pool3:', sess.run(tf.shape(net['pool3']), feed_dict=feed_dict))
+            print('pool4:', sess.run(tf.shape(net['pool4']), feed_dict=feed_dict))
+            print("\nTRAINING:", itr, '\n') """
             sess.run(train_op, feed_dict=feed_dict)
+            
 
             if itr % 50 == 0:
                 feed_dict = {image: train_images, annotation: train_annotations, keep_probability: 1.0, is_training: False}

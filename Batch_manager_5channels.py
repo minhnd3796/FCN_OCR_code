@@ -4,8 +4,8 @@ import tensorflow as tf
 from os.path import exists, join
 from os import mkdir
 from batch_eval_top import eval_dir
-from batch_eval_potsdam import eval_dir_potsdam
-from batch_eval_15 import eval_dir_15
+# from batch_eval_potsdam import eval_dir_potsdam
+# from batch_eval_15 import eval_dir_15
 
 class Batch_manager:
     files = []
@@ -35,8 +35,8 @@ class Batch_manager:
 
     def _read_images(self):
         self.__channels = True
-        self.images = np.array([self._transform(filename['image']) for filename in self.files])
-        # self.images = np.array([np.load(filename) for filename in self.files])        
+        self.images = np.array([imread(filename['image']).astype(np.float16) for filename in self.files])
+        # self.images = np.array([self._transform(filename['image']) for filename in self.files])
         self.__channels = False
         self.annotations = np.array(
             [np.expand_dims(self._transform_annotations(filename['annotation']), axis=3) for filename in self.files])
@@ -67,9 +67,9 @@ class Batch_manager:
             self.epochs_completed += 1
             saver.save(sess, log_dir + "model.ckpt", self.epochs_completed)
             print("****************** Epochs completed: " + str(self.epochs_completed) + "******************")
-            """ if not is_validation:
-                eval_dir(input_tensor, logits, keep_probability, sess, is_training, batch_size, log_dir, self.epochs_completed, encoding_keep_prob=encoding_keep_prob, is_validation=False, num_channels=5)
-                eval_dir(input_tensor, logits, keep_probability, sess, is_training, batch_size, log_dir, self.epochs_completed, encoding_keep_prob=encoding_keep_prob, is_validation=True, num_channels=5) """
+            if not is_validation:
+                eval_dir(input_tensor, logits, keep_probability, sess, is_training, batch_size, log_dir, self.epochs_completed, encoding_keep_prob=encoding_keep_prob, is_validation=False, num_channels=3)
+                eval_dir(input_tensor, logits, keep_probability, sess, is_training, batch_size, log_dir, self.epochs_completed, encoding_keep_prob=encoding_keep_prob, is_validation=True, num_channels=3)
             # Start next epoch
             start = 0
             self.batch_offset = batch_size
