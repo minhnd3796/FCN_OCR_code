@@ -4,7 +4,7 @@ from os.path import join
 from os import listdir
 from sys import argv
 
-annotation_dir = "../processed/annotations"
+annotation_dir = "../FCN_OCR_dataset/annotations"
 files = listdir(annotation_dir)
 
 validation_image = files[int(len(files) * 0.8):]
@@ -16,7 +16,7 @@ CROP_SIZE = 32
 STRIDE = int(argv[1])
 
 for img_name in validation_image:
-    img = imread(join('../processed/annotations', img_name))
+    img = imread(join('../FCN_OCR_dataset/annotations', img_name))
     print("Processing", img_name)
     # num_validation_crops += (img.shape[0] - CROP_SIZE + 1) * (img.shape[1] - CROP_SIZE + 1)
     i = 0
@@ -28,7 +28,7 @@ for img_name in validation_image:
         i += STRIDE
 
 for img_name in training_image:
-    img = imread(join('../processed/annotations', img_name))
+    img = imread(join('../FCN_OCR_dataset/annotations', img_name))
     print("Processing", img_name)
     # num_training_crops += (img.shape[0] - CROP_SIZE + 1) * (img.shape[1] - CROP_SIZE + 1)
     i = 0
