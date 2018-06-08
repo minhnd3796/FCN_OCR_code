@@ -17,8 +17,10 @@ STRIDE = 2
 files = listdir(annotation_dir)
 training_image = files[:int(len(files) * 0.8)]
 validation_image = files[int(len(files) * 0.8):]
+""" training_image = files[:1600]
+validation_image = files[1600:2000] """
 
-pool = mp.Pool(80)
+pool = mp.Pool(mp.cpu_count())
 
 def crop_training_img(filename):
     print("Training:", filename)
@@ -33,9 +35,9 @@ def crop_training_img(filename):
         while y + (CROP_SIZE - 1) <= width - 1:
             i += 1
             input_image_cropped = input_image[x:x + CROP_SIZE, y:y + CROP_SIZE, :]
-            imwrite(join("../FCN_OCR_dataset/training", splitext(filename)[0] + "_" + str(i) + ".png"), input_image_cropped)
+            imwrite(join(training_dir, splitext(filename)[0] + "_" + str(i) + ".png"), input_image_cropped)
             annotation_image_cropped = annotation_image[x:x + CROP_SIZE, y:y + CROP_SIZE]
-            imwrite(join("../FCN_OCR_dataset/ground_truth", splitext(filename)[0] + "_" + str(i) + ".png"), annotation_image_cropped)
+            imwrite(join(gt_dir, splitext(filename)[0] + "_" + str(i) + ".png"), annotation_image_cropped)
             y += STRIDE
         x += STRIDE
 
@@ -52,9 +54,9 @@ def crop_validation_img(filename):
         while y + (CROP_SIZE - 1) <= width - 1:
             i += 1
             input_image_cropped = input_image[x:x + CROP_SIZE, y:y + CROP_SIZE, :]
-            imwrite(join("../FCN_OCR_dataset/validation", splitext(filename)[0] + "_" + str(i) + ".png"), input_image_cropped)
+            imwrite(join(validation_dir, splitext(filename)[0] + "_" + str(i) + ".png"), input_image_cropped)
             annotation_image_cropped = annotation_image[x:x + CROP_SIZE, y:y + CROP_SIZE]
-            imwrite(join("../FCN_OCR_dataset/ground_truth", splitext(filename)[0] + "_" + str(i) + ".png"), annotation_image_cropped)
+            imwrite(join(gt_dir, splitext(filename)[0] + "_" + str(i) + ".png"), annotation_image_cropped)
             y += STRIDE
         x += STRIDE
 
@@ -63,7 +65,9 @@ def create_training_dataset():
         mkdir(training_dir)
     if not exists(gt_dir):
         mkdir(gt_dir)
-    pool.map(crop_training_img, training_image)
+    # pool.map(crop_training_img, training_image)
+    for item in training_image:
+        crop_training_img(item)
     
     return None
 
@@ -73,7 +77,9 @@ def create_validation_dataset():
         mkdir(validation_dir)
     if not exists(gt_dir):
         mkdir(gt_dir)
-    pool.map(crop_validation_img, validation_image)
+    # pool.map(crop_validation_img, validation_image)
+    for item in validation_image:
+        crop_validation_img(item)
     
     return None
 

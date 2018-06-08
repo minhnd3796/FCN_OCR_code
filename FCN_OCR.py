@@ -11,7 +11,7 @@ from sys import argv
 from os.path import join
 
 FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_integer("batch_size", "8192", "batch size for training")
+tf.flags.DEFINE_integer("batch_size", "4096", "batch size for training")
 tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR/", "path to logs directory")
 tf.flags.DEFINE_string("data_dir", "../FCN_OCR_dataset", "path to dataset")
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
@@ -44,25 +44,50 @@ def conv_bn_relu(current, no_1, no_2, in_channels, out_channels, keep_prob, is_t
 
     return current
 
+C_1 = 64
+C_2 = 128
+C_3 = 256
+C_4 = 512
+
 def encoding_net(normalised_img, keep_prob, is_training):
     net = {}
     current = normalised_img
 
-    current = conv_bn_relu(current, 1, 1, 3, 32, keep_prob, is_training)
+    """ current = conv_bn_relu(current, 1, 1, 3, 64, keep_prob, is_training)
+    current = conv_bn_relu(current, 1, 2, 64, 64, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net['pool1'] = current
 
-    current = conv_bn_relu(current, 2, 1, 32, 64, keep_prob, is_training)
+    current = conv_bn_relu(current, 2, 1, 64, 128, keep_prob, is_training)
+    current = conv_bn_relu(current, 2, 2, 128, 128, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net['pool2'] = current
 
-    current = conv_bn_relu(current, 3, 1, 64, 128, keep_prob, is_training)
+    current = conv_bn_relu(current, 3, 1, 128, 256, keep_prob, is_training)
+    current = conv_bn_relu(current, 3, 2, 256, 256, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net['pool3'] = current
 
-    current = conv_bn_relu(current, 4, 1, 128, 256, keep_prob, is_training)
+    current = conv_bn_relu(current, 4, 1, 256, 512, keep_prob, is_training)
+    current = conv_bn_relu(current, 4, 2, 512, 512, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
-    net['pool4'] = current
+    net['pool4'] = current """
+
+    current = conv_bn_relu(current, 1, 1, 3, C_1, keep_prob, is_training)
+    current = conv_bn_relu(current, 1, 2, C_1, C_1, keep_prob, is_training)
+    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
+    net['pool1'] = current
+
+    current = conv_bn_relu(current, 2, 1, C_1, C_2, keep_prob, is_training)
+    current = conv_bn_relu(current, 2, 2, C_2, C_2, keep_prob, is_training)
+    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
+    net['pool2'] = current
+
+    current = conv_bn_relu(current, 3, 1, C_2, C_3, keep_prob, is_training)
+    current = conv_bn_relu(current, 3, 2, C_3, C_3, keep_prob, is_training)
+    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
+    net['pool3'] = current
+    
     return net
 
 def inference(image, keep_prob, is_training):
@@ -76,9 +101,9 @@ def inference(image, keep_prob, is_training):
 
     with tf.variable_scope("inference"):
         net = encoding_net(normalised_img, keep_prob, is_training)
-        last_layer = net["pool4"]
+        last_layer = net["pool3"]
 
-        fc_filter = utils.weight_variable([1, 1, 256, NUM_OF_CLASSES], name="fc_filter")
+        fc_filter = utils.weight_variable([1, 1, C_3, NUM_OF_CLASSES], name="fc_filter")
         fc_bias = utils.bias_variable([NUM_OF_CLASSES], name="fc_bias")
         fc = tf.nn.bias_add(tf.nn.conv2d(last_layer, fc_filter, strides=[1, 1, 1, 1], padding="SAME"), fc_bias, name='fc')
 
@@ -87,7 +112,7 @@ def inference(image, keep_prob, is_training):
         deconv_shape3 = tf.stack([shape[0], shape[1], shape[2], NUM_OF_CLASSES])
         W_t3 = tf.get_variable(name='deconv_W', initializer=init, shape=(32, 32, NUM_OF_CLASSES, NUM_OF_CLASSES))
         b_t3 = tf.get_variable(name='deconv_b', initializer=init, shape=(NUM_OF_CLASSES))
-        conv_t3 = utils.conv2d_transpose_strided(fc, W_t3, b_t3, output_shape=deconv_shape3, stride=16)
+        conv_t3 = utils.conv2d_transpose_strided(fc, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
 
         """ deconv_shape1 = net["res4b22_relu"].get_shape()
         W_t1 = utils.weight_variable([4, 4, deconv_shape1[3].value, NUM_OF_CLASSES], name="W_t1")
@@ -193,48 +218,6 @@ def main(argv=None):
         train_dataset_reader = dataset.Batch_manager(train_records, image_options)
     validation_dataset_reader = dataset.Batch_manager(valid_records, image_options)
 
-    """ os.environ["CUDA_VISIBLE_DEVICES"] = argv[1]
-    keep_probability = tf.placeholder(tf.float32, name="keep_probabilty")
-    image = tf.placeholder(tf.float32, shape=[None, IMAGE_SIZE, IMAGE_SIZE, 3], name="input_image")
-    annotation = tf.placeholder(tf.int32, shape=[None, IMAGE_SIZE, IMAGE_SIZE, 1], name="annotation")
-    pred_annotation, logits = inference(image, keep_probability)
-    annotation_64 = tf.cast(annotation, dtype=tf.int64)
-    # calculate accuracy for batch.
-    cal_acc = tf.equal(pred_annotation, annotation_64)
-    cal_acc = tf.cast(cal_acc, dtype=tf.int8)
-    acc = tf.count_nonzero(cal_acc) / (FLAGS.batch_size * IMAGE_SIZE * IMAGE_SIZE)
-    tf.summary.image("input_image", image, max_outputs=2)
-    tf.summary.image("ground_truth", tf.cast(annotation, tf.uint8), max_outputs=2)
-    tf.summary.image("pred_annotation", tf.cast(pred_annotation, tf.uint8), max_outputs=2)
-    loss = tf.reduce_mean((tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
-                                                                          labels=tf.squeeze(annotation,
-                                                                                            squeeze_dims=[3]),
-                                                                          name="entropy")))
-    loss_summary=tf.summary.scalar("entropy", loss)
-    # summary accuracy in tensorboard
-    acc_summary=tf.summary.scalar("accuracy", acc)
-    trainable_var = tf.trainable_variables()
-    if FLAGS.debug:
-        for var in trainable_var:
-            utils.add_to_regularization_and_summary(var)
-    train_op = train(loss, trainable_var)
-    print("Setting up summary op...")
-    summary_op = tf.summary.merge_all()
-
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    sess = tf.Session(config=config)
-
-    print("Setting up Saver...")
-    saver = tf.train.Saver()
-    # train_writer = tf.summary.FileWriter(FLAGS.logs_dir + '/train', sess.graph)
-    # validation_writer = tf.summary.FileWriter(FLAGS.logs_dir + '/validation')
-    sess.run(tf.global_variables_initializer())
-    ckpt = tf.train.get_checkpoint_state(FLAGS.logs_dir)
-    if ckpt and ckpt.model_checkpoint_path:
-        saver.restore(sess, ckpt.model_checkpoint_path)
-        print("Model restored...") """
-
     if FLAGS.mode == "train":
         for itr in xrange(MAX_ITERATION):
             train_images, train_annotations = train_dataset_reader.next_batch(saver, FLAGS.batch_size, image, logits, keep_probability, sess, is_training, FLAGS.logs_dir)
@@ -259,7 +242,7 @@ def main(argv=None):
                     f.write(str(itr) + ',' + str(train_acc) + '\n')
                 train_writer.add_summary(summary_loss, itr)
                 train_writer.add_summary(summary_acc, itr)
-            if itr % 600 == 0:
+            if itr % 1000 == 0:
                 valid_images, valid_annotations = validation_dataset_reader.next_batch(saver, FLAGS.batch_size, image, logits, keep_probability, sess, is_training, FLAGS.logs_dir, is_validation=True)
                 valid_loss, valid_acc, summary_loss, summary_acc = sess.run([loss, acc, loss_summary, acc_summary],
                                                 feed_dict={image: valid_images, annotation: valid_annotations,
@@ -271,7 +254,7 @@ def main(argv=None):
                     f.write(str(itr) + ',' + str(valid_loss) + '\n')
                 with open(join(FLAGS.logs_dir, 'iter_val_acc.csv'), 'a') as f:
                     f.write(str(itr) + ',' + str(valid_acc) + '\n')
-                saver.save(sess, FLAGS.logs_dir + "model.ckpt", itr)
+                # saver.save(sess, FLAGS.logs_dir + "model.ckpt", itr)
 
     elif FLAGS.mode == "visualize":
         valid_images, valid_annotations = validation_dataset_reader.get_random_batch(FLAGS.batch_size)
