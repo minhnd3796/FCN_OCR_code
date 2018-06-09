@@ -30,16 +30,16 @@ def conv_bn_relu(current, no_1, no_2, in_channels, out_channels, keep_prob, is_t
                            initializer=init, shape=(out_channels))
     current = tf.nn.bias_add(tf.nn.conv2d(current, filters, strides=[1, 1, 1, 1], padding="SAME"), bias)
     
-    """ batch_mean, batch_var = tf.nn.moments(current, [0, 1, 2], name='batch_moments')
-    decay = 0.9
-    ema = tf.train.ExponentialMovingAverage(decay=decay)
-    mean = 
+    batch_mean, batch_var = tf.nn.moments(current, [0, 1, 2], name='batch_moments')
+    ema = tf.train.ExponentialMovingAverage(decay=0.9)
     def mean_var_with_update():
         ema_apply_op = ema.apply([batch_mean, batch_var])
         with tf.control_dependencies([ema_apply_op]):
             return tf.identity(batch_mean), tf.identity(batch_var)
     mean, variance = tf.cond(is_training, mean_var_with_update, lambda: (ema.average(batch_mean), ema.average(batch_var)))
-    current = tf.nn.batch_normalization(current, mean, variance, offset, scale, 1e-5, name=layer_names[1]) """
+    offset = tf.Variable(tf.constant(0.0, shape=[out_channels]), name='offset' + str(no_1) + '_' + str(no_2), trainable=True)
+    scale = tf.Variable(tf.constant(1.0, shape=[out_channels]), name='scale' + str(no_1) + '_' + str(no_2), trainable=True)
+    current = tf.nn.batch_normalization(current, mean, variance, offset, scale, 1e-5)
     current = tf.nn.relu(current)
 
     return current
