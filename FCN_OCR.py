@@ -11,7 +11,7 @@ from sys import argv
 from os.path import join
 
 FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_integer("batch_size", "4096", "batch size for training")
+tf.flags.DEFINE_integer("batch_size", "2048", "batch size for training")
 tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR/", "path to logs directory")
 tf.flags.DEFINE_string("data_dir", "../FCN_OCR_dataset", "path to dataset")
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
@@ -29,7 +29,7 @@ def conv_bn_relu(current, no_1, no_2, in_channels, out_channels, keep_prob, is_t
     bias = tf.get_variable(name='conv' + str(no_1) + '_' + str(no_2) + '_' + 'b',
                            initializer=init, shape=(out_channels))
     current = tf.nn.bias_add(tf.nn.conv2d(current, filters, strides=[1, 1, 1, 1], padding="SAME"), bias)
-    
+
     batch_mean, batch_var = tf.nn.moments(current, [0, 1, 2], name='batch_moments')
     ema = tf.train.ExponentialMovingAverage(decay=0.9)
     def mean_var_with_update():
@@ -53,26 +53,6 @@ def encoding_net(normalised_img, keep_prob, is_training):
     net = {}
     current = normalised_img
 
-    """ current = conv_bn_relu(current, 1, 1, 3, 64, keep_prob, is_training)
-    current = conv_bn_relu(current, 1, 2, 64, 64, keep_prob, is_training)
-    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
-    net['pool1'] = current
-
-    current = conv_bn_relu(current, 2, 1, 64, 128, keep_prob, is_training)
-    current = conv_bn_relu(current, 2, 2, 128, 128, keep_prob, is_training)
-    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
-    net['pool2'] = current
-
-    current = conv_bn_relu(current, 3, 1, 128, 256, keep_prob, is_training)
-    current = conv_bn_relu(current, 3, 2, 256, 256, keep_prob, is_training)
-    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
-    net['pool3'] = current
-
-    current = conv_bn_relu(current, 4, 1, 256, 512, keep_prob, is_training)
-    current = conv_bn_relu(current, 4, 2, 512, 512, keep_prob, is_training)
-    current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
-    net['pool4'] = current """
-
     current = conv_bn_relu(current, 1, 1, 3, C_1, keep_prob, is_training)
     current = conv_bn_relu(current, 1, 2, C_1, C_1, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
@@ -87,7 +67,7 @@ def encoding_net(normalised_img, keep_prob, is_training):
     current = conv_bn_relu(current, 3, 2, C_3, C_3, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net['pool3'] = current
-    
+
     return net
 
 def inference(image, keep_prob, is_training):
@@ -95,7 +75,6 @@ def inference(image, keep_prob, is_training):
     mean_pixel[:, :, 0] = np.ones((IMAGE_SIZE, IMAGE_SIZE)) * 135.21788372620313
     mean_pixel[:, :, 1] = np.ones((IMAGE_SIZE, IMAGE_SIZE)) * 145.12055858608417
     mean_pixel[:, :, 2] = np.ones((IMAGE_SIZE, IMAGE_SIZE)) * 135.06357015876557
-    
 
     normalised_img = utils.process_image(image, mean_pixel)
 
@@ -109,10 +88,10 @@ def inference(image, keep_prob, is_training):
 
         # now to upscale to actual image size
         shape = tf.shape(image)
-        deconv_shape3 = tf.stack([shape[0], shape[1], shape[2], NUM_OF_CLASSES])
-        W_t3 = tf.get_variable(name='deconv_W', initializer=init, shape=(32, 32, NUM_OF_CLASSES, NUM_OF_CLASSES))
-        b_t3 = tf.get_variable(name='deconv_b', initializer=init, shape=(NUM_OF_CLASSES))
-        conv_t3 = utils.conv2d_transpose_strided(fc, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
+        deconv_shape1 = tf.stack([shape[0], shape[1], shape[2], NUM_OF_CLASSES])
+        W_t1 = tf.get_variable(name='W_t1', initializer=init, shape=(32, 32, NUM_OF_CLASSES, NUM_OF_CLASSES))
+        b_t1 = tf.get_variable(name='b_t1', initializer=init, shape=(NUM_OF_CLASSES))
+        conv_t1 = utils.conv2d_transpose_strided(fc, W_t1, b_t1, output_shape=deconv_shape1, stride=8)
 
         """ deconv_shape1 = net["res4b22_relu"].get_shape()
         W_t1 = utils.weight_variable([4, 4, deconv_shape1[3].value, NUM_OF_CLASSES], name="W_t1")
@@ -134,7 +113,7 @@ def inference(image, keep_prob, is_training):
 
         annotation_pred = tf.argmax(conv_t3, axis=3, name="prediction")
 
-    return tf.expand_dims(annotation_pred, dim=3), conv_t3, net
+    return tf.expand_dims(annotation_pred, dim=3), conv_t1, net
 
 def train(loss_val, var_list):
     optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
@@ -230,7 +209,7 @@ def main(argv=None):
             print('pool4:', sess.run(tf.shape(net['pool4']), feed_dict=feed_dict))
             print("\nTRAINING:", itr, '\n') """
             sess.run(train_op, feed_dict=feed_dict)
-            
+
 
             if itr % 50 == 0:
                 feed_dict = {image: train_images, annotation: train_annotations, keep_probability: 1.0, is_training: False}
@@ -242,7 +221,7 @@ def main(argv=None):
                     f.write(str(itr) + ',' + str(train_acc) + '\n')
                 train_writer.add_summary(summary_loss, itr)
                 train_writer.add_summary(summary_acc, itr)
-            if itr % 1000 == 0:
+            if itr % 180 == 0:
                 valid_images, valid_annotations = validation_dataset_reader.next_batch(saver, FLAGS.batch_size, image, logits, keep_probability, sess, is_training, FLAGS.logs_dir, is_validation=True)
                 valid_loss, valid_acc, summary_loss, summary_acc = sess.run([loss, acc, loss_summary, acc_summary],
                                                 feed_dict={image: valid_images, annotation: valid_annotations,
