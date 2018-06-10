@@ -7,6 +7,9 @@ from batch_eval_top import eval_dir
 # from batch_eval_potsdam import eval_dir_potsdam
 # from batch_eval_15 import eval_dir_15
 
+STRIDE = 1
+CROP_SIZE = 32
+
 class Batch_manager:
     files = []
     images = []
@@ -15,8 +18,11 @@ class Batch_manager:
     batch_offset = 0
     epochs_completed = 0
     seed = 3796
+    data_dir = ''
+    input_img_dir = 'input_img'
+    annotation_dir = 'annotations'
 
-    def __init__(self, records_list, image_options={}):
+    def __init__(self, records_list, data_dir, image_options={}):
         """
         Intialize a generic file reader with batching for list of files
         :param records_list: list of file records to read -
@@ -31,17 +37,41 @@ class Batch_manager:
         print(image_options)
         self.files = records_list
         self.image_options = image_options
+        self.data_dir = data_dir
         self._read_images()
+
+    def get_crops(self, img_type_dir):
+        imgs = []
+        for file in self.files:
+            if img_type_dir == self.annotation_dir:
+                full_img = imread(join(self.data_dir, img_type_dir, file), -1)
+            else:
+                full_img = imread(join(self.data_dir, img_type_dir, file))
+            width = np.shape(full_img)[1]
+            height = np.shape(full_img)[0]
+            i = 0
+            x = 0
+            while x + (CROP_SIZE - 1) <= height - 1:
+                y = 0
+                while y + (CROP_SIZE - 1) <= width - 1:
+                    i += 1
+                    imgs.append(full_img[x:x + CROP_SIZE, y:y + CROP_SIZE, :])
+                    y += STRIDE
+                x += STRIDE
+        imgs = np.array(imgs)
+        if img_type_dir == self.annotation_dir:
+            imgs = np.expand_dims(imgs, axis=3)
+        return imgs
 
     def _read_images(self):
         self.__channels = True
-        self.images = np.array([imread(filename['image']).astype(np.float16) for filename in self.files])
-        # self.images = np.array([self._transform(filename['image']) for filename in self.files])
+        # self.images = np.array([imread(filename['image']).astype(np.float16) for filename in self.files])
+        self.images = np.array(self.get_crops(self.input_img_dir))
         self.__channels = False
-        self.annotations = np.array(
-            [np.expand_dims(self._transform_annotations(filename['annotation']), axis=3) for filename in self.files])
-        print (self.images.shape)
-        print (self.annotations.shape)
+        # self.annotations = np.array([np.expand_dims(self._transform_annotations(filename['annotation']), axis=3) for filename in self.files])
+        self.annotations = np.array(self.get_crops(self.annotation_dir))
+        print(self.images.shape)
+        print(self.annotations.shape)
 
     def _transform(self, filename):
         image = np.load(filename)

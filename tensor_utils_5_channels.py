@@ -1,18 +1,9 @@
 import os
 from functools import reduce
 
-import scipy.io
-# import scipy.misc as misc
 import tensorflow as tf
 import numpy as np
 from cv2 import imwrite
-
-
-def get_model_data(filepath):
-    if not os.path.exists(filepath):
-        raise IOError("VGG Model not found!")
-    data = scipy.io.loadmat(filepath)
-    return data
 
 def save_image(image, save_dir, name, mean=None):
     if mean:

@@ -1,5 +1,5 @@
 from __future__ import print_function
-import os
+from os import environ, listdir
 import numpy as np
 import tensorflow as tf
 from six.moves import xrange
@@ -11,7 +11,7 @@ from sys import argv
 from os.path import join
 
 FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_integer("batch_size", "2048", "batch size for training")
+tf.flags.DEFINE_integer("batch_size", "32", "batch size for training")
 tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR/", "path to logs directory")
 tf.flags.DEFINE_string("data_dir", "../FCN_OCR_dataset", "path to dataset")
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
@@ -111,7 +111,7 @@ def inference(image, keep_prob, is_training):
         b_t3 = utils.bias_variable([NUM_OF_CLASSES], name="b_t3")
         conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8) """
 
-        annotation_pred = tf.argmax(conv_t3, axis=3, name="prediction")
+        annotation_pred = tf.argmax(conv_t1, axis=3, name="prediction")
 
     return tf.expand_dims(annotation_pred, dim=3), conv_t1, net
 
@@ -134,7 +134,7 @@ def _decay(weight_decay):
     return tf.multiply(weight_decay, tf.add_n(costs))
 
 def build_session(cuda_device):
-    os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
+    environ["CUDA_VISIBLE_DEVICES"] = cuda_device
 
     keep_probability = tf.placeholder(tf.float32, name="keep_probabilty")
     image = tf.placeholder(tf.float32, shape=[None, IMAGE_SIZE, IMAGE_SIZE, 3], name="input_image")
@@ -187,15 +187,19 @@ def main(argv=None):
     net, image, logits, is_training, keep_probability, sess, annotation, train_op, loss, acc, loss_summary, acc_summary, saver, pred_annotation, train_writer, validation_writer = build_session(argv[1])
 
     print("Setting up image reader...")
-    train_records, valid_records = reader.read_dataset_OCR(FLAGS.data_dir)
+    """ train_records, valid_records = reader.read_dataset_OCR(FLAGS.data_dir)
     print(len(train_records))
-    print(len(valid_records))
+    print(len(valid_records)) """
+
+    files = listdir(join(FLAGS.data_dir, 'annotations'))
+    training_image = files[:int(len(files) * 0.8)]
+    validation_image = files[int(len(files) * 0.8):]
 
     print("Setting up dataset reader")
     image_options = {'resize': False, 'resize_size': IMAGE_SIZE}
     if FLAGS.mode == 'train':
-        train_dataset_reader = dataset.Batch_manager(train_records, image_options)
-    validation_dataset_reader = dataset.Batch_manager(valid_records, image_options)
+        train_dataset_reader = dataset.Batch_manager(training_image, FLAGS.data_dir, image_options)
+    validation_dataset_reader = dataset.Batch_manager(validation_image, FLAGS.data_dir, image_options)
 
     if FLAGS.mode == "train":
         for itr in xrange(MAX_ITERATION):
@@ -211,7 +215,7 @@ def main(argv=None):
             sess.run(train_op, feed_dict=feed_dict)
 
 
-            if itr % 50 == 0:
+            if itr % 1 == 0:
                 feed_dict = {image: train_images, annotation: train_annotations, keep_probability: 1.0, is_training: False}
                 train_loss, train_acc, summary_loss, summary_acc = sess.run([loss, acc, loss_summary, acc_summary], feed_dict=feed_dict)
                 print("Step: %d, Train_loss: %g, Train_acc: %g" % (itr, train_loss, train_acc))
@@ -221,7 +225,7 @@ def main(argv=None):
                     f.write(str(itr) + ',' + str(train_acc) + '\n')
                 train_writer.add_summary(summary_loss, itr)
                 train_writer.add_summary(summary_acc, itr)
-            if itr % 180 == 0:
+            if itr % 3 == 0:
                 valid_images, valid_annotations = validation_dataset_reader.next_batch(saver, FLAGS.batch_size, image, logits, keep_probability, sess, is_training, FLAGS.logs_dir, is_validation=True)
                 valid_loss, valid_acc, summary_loss, summary_acc = sess.run([loss, acc, loss_summary, acc_summary],
                                                 feed_dict={image: valid_images, annotation: valid_annotations,
