@@ -55,7 +55,10 @@ class Batch_manager:
                 y = 0
                 while y + (CROP_SIZE - 1) <= width - 1:
                     i += 1
-                    imgs.append(full_img[x:x + CROP_SIZE, y:y + CROP_SIZE, :])
+                    if img_type_dir == self.annotation_dir:
+                        imgs.append(full_img[x:x + CROP_SIZE, y:y + CROP_SIZE])
+                    else:
+                        imgs.append(full_img[x:x + CROP_SIZE, y:y + CROP_SIZE, :])
                     y += STRIDE
                 x += STRIDE
         imgs = np.array(imgs)

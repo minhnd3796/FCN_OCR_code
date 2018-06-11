@@ -11,14 +11,14 @@ from sys import argv
 from os.path import join
 
 FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_integer("batch_size", "32", "batch size for training")
-tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR/", "path to logs directory")
+tf.flags.DEFINE_integer("batch_size", "1024", "batch size for training")
+tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR_2/", "path to logs directory")
 tf.flags.DEFINE_string("data_dir", "../FCN_OCR_dataset", "path to dataset")
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
 tf.flags.DEFINE_bool('debug', "False", "Debug mode: True/ False")
 tf.flags.DEFINE_string('mode', "train", "Mode train/ test/ visualize")
 
-MAX_ITERATION = int(153600 + 1) # 25 epochs
+MAX_ITERATION = int(1000001) # 25 epochs
 NUM_OF_CLASSES = 2
 IMAGE_SIZE = 32
 
@@ -47,7 +47,7 @@ def conv_bn_relu(current, no_1, no_2, in_channels, out_channels, keep_prob, is_t
 C_1 = 64
 C_2 = 128
 C_3 = 256
-C_4 = 512
+# C_4 = 512
 
 def encoding_net(normalised_img, keep_prob, is_training):
     net = {}
@@ -215,7 +215,7 @@ def main(argv=None):
             sess.run(train_op, feed_dict=feed_dict)
 
 
-            if itr % 1 == 0:
+            if itr % 50 == 0:
                 feed_dict = {image: train_images, annotation: train_annotations, keep_probability: 1.0, is_training: False}
                 train_loss, train_acc, summary_loss, summary_acc = sess.run([loss, acc, loss_summary, acc_summary], feed_dict=feed_dict)
                 print("Step: %d, Train_loss: %g, Train_acc: %g" % (itr, train_loss, train_acc))
@@ -225,7 +225,7 @@ def main(argv=None):
                     f.write(str(itr) + ',' + str(train_acc) + '\n')
                 train_writer.add_summary(summary_loss, itr)
                 train_writer.add_summary(summary_acc, itr)
-            if itr % 3 == 0:
+            if itr % 500 == 0:
                 valid_images, valid_annotations = validation_dataset_reader.next_batch(saver, FLAGS.batch_size, image, logits, keep_probability, sess, is_training, FLAGS.logs_dir, is_validation=True)
                 valid_loss, valid_acc, summary_loss, summary_acc = sess.run([loss, acc, loss_summary, acc_summary],
                                                 feed_dict={image: valid_images, annotation: valid_annotations,
