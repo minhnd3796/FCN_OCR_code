@@ -6,7 +6,8 @@ from sys import argv
 from batch_eval_top import create_patch_batch_list, batch_logits_map_inference
 import numpy as np
 from cv2 import imread, imwrite, threshold, findContours, boundingRect, rectangle, RETR_EXTERNAL, COLOR_GRAY2RGB
-from os.path import exists, join
+from os.path import exists, join, splitext
+import json
 
 IMAGE_SIZE = 32
 CHOPPING_RATIO = 0.5
@@ -38,7 +39,7 @@ if __name__ == '__main__':
         gt_annotation_map = np.array(imread(join(data_dir, annotation_dir, file), -1), dtype=np.uint8)
         input_img = imread(join(data_dir, input_dir, file))
 
-        input_batch_list, coordinate_batch_list, height, width = create_patch_batch_list(filename=file, batch_size=2048)
+        input_batch_list, coordinate_batch_list, height, width = create_patch_batch_list(filename=file, batch_size=128)
         logits_map = batch_logits_map_inference(input_tensor, logits, keep_probability, sess, is_training, input_batch_list, coordinate_batch_list, height, width)
 
         # Inferring
@@ -56,6 +57,23 @@ if __name__ == '__main__':
                     for j in range(h):
                         pred_annotation_map[y + j, x + i] = 0
 
+        boxes_map = np.zeros_like(pred_annotation_map, dtype=np.uint8)
+        _, thresh = threshold(pred_annotation_map, 0, 255, 0)
+        _, contours, _ = findContours(thresh, RETR_EXTERNAL, 2)
+        json_name = splitext(file)[0] + '.json'
+        json_dict = {}
+        name_boxes = []
+        for cnt in contours:
+            x,y,w,h = boundingRect(cnt)
+            name_boxes.append([x, y, x + w, y + h])
+            for i in range(w):
+                for j in range(h):
+                    boxes_map[y + j, x + i] = 1
+        json_dict['name_boxes'] = name_boxes
+        print(json_dict)
+        with open(join('validation_name_boxes', json_name), 'w') as outfile:
+            json.dump(json_dict, outfile)
+
         height = pred_annotation_map.shape[0]
         width = pred_annotation_map.shape[1]
         # _, contours, _ = findContours(thresh, RETR_EXTERNAL, 2)
@@ -67,7 +85,7 @@ if __name__ == '__main__':
             mkdir(argv[1])
         if not exists(join(argv[1], 'located_words')):
             mkdir(join(argv[1], 'located_words'))
-        output_image = np.transpose(np.transpose(input_img, (2, 0, 1)) * pred_annotation_map, (1, 2, 0))
+        output_image = np.transpose(np.transpose(input_img, (2, 0, 1)) * boxes_map, (1, 2, 0))
         imwrite(join(argv[1], 'located_words', file), output_image)
 
     # Print accuracy
