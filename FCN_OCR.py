@@ -11,8 +11,8 @@ from sys import argv
 from os.path import join
 
 FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_integer("batch_size", "1024", "batch size for training")
-tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR_2/", "path to logs directory")
+tf.flags.DEFINE_integer("batch_size", "2048", "batch size for training")
+tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR/", "path to logs directory")
 tf.flags.DEFINE_string("data_dir", "../FCN_OCR_dataset", "path to dataset")
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
 tf.flags.DEFINE_bool('debug', "False", "Debug mode: True/ False")
@@ -47,7 +47,6 @@ def conv_bn_relu(current, no_1, no_2, in_channels, out_channels, keep_prob, is_t
 C_1 = 64
 C_2 = 128
 C_3 = 256
-# C_4 = 512
 
 def encoding_net(normalised_img, keep_prob, is_training):
     net = {}
