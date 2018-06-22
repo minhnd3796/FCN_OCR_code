@@ -5,7 +5,7 @@ from os import environ, mkdir, listdir
 from sys import argv
 from batch_eval_top import create_patch_batch_list, batch_logits_map_inference
 import numpy as np
-from cv2 import imread, imwrite, threshold, findContours, boundingRect, rectangle, RETR_EXTERNAL, COLOR_GRAY2RGB
+from cv2 import imread, imwrite, threshold, findContours, boundingRect, rectangle, RETR_EXTERNAL, COLOR_GRAY2RGB, namedWindow, imshow, waitKey, destroyAllWindows, contourArea
 from os.path import exists, join
 import json
 
@@ -19,6 +19,40 @@ pred_masks_dir = 'pred_masks'
 pred_boxed_masks_dir = 'pred_boxed_masks'
 num_matches = 0
 num_pixels = 0
+
+def infer_one_img(file):
+    input_img = imread('../FCN_OCR_dataset/input_img/' + file)
+    input_batch_list, coordinate_batch_list, height, width = create_patch_batch_list(filename=file, batch_size=128)
+    logits_map = batch_logits_map_inference(input_tensor, logits, keep_probability, sess, is_training, input_batch_list, coordinate_batch_list, height, width)
+    # Inferring
+    pred_annotation_map = np.array(np.argmax(logits_map, axis=2), dtype=np.uint8)
+    _, thresh = threshold(pred_annotation_map, 0, 255, 0)
+    _, contours, _ = findContours(thresh, RETR_EXTERNAL, 2)
+    for cnt in contours:
+        x,y,w,h = boundingRect(cnt)
+        for i in range(w):
+            count_white = 0
+            for j in range(h):
+                if thresh[y + j, x + i] == 255:
+                    count_white += 1
+            if count_white / h <= CHOPPING_RATIO:
+                for j in range(h):
+                    pred_annotation_map[y + j, x + i] = 0
+
+    boxes_map = np.zeros_like(pred_annotation_map, dtype=np.uint8)
+    _, thresh = threshold(pred_annotation_map, 0, 255, 0)
+    _, contours, _ = findContours(thresh, RETR_EXTERNAL, 2)
+    for cnt in contours:
+        x,y,w,h = boundingRect(cnt)
+        for i in range(w):
+            for j in range(h):
+                boxes_map[y + j, x + i] = 1
+    output_words = np.transpose(np.transpose(input_img, (2, 0, 1)) * boxes_map, (1, 2, 0))
+    """ namedWindow('image', cv2.WINDOW_NORMAL)
+    imshow('image', output_words)
+    waitKey(0)
+    destroyAllWindows() """
+    imwrite('/home/minhnd/Desktop/ditmemay.png', output_words)
 
 def infer_img(file, model_output_dir=argv[1]):
     global num_matches
@@ -58,11 +92,13 @@ def infer_img(file, model_output_dir=argv[1]):
     json_dict = {}
     name_boxes = []
     for cnt in contours:
-        x,y,w,h = boundingRect(cnt)
-        name_boxes.append([x, y, x + w, y + h])
-        for i in range(w):
-            for j in range(h):
-                boxes_map[y + j, x + i] = 1
+        if contourArea(cnt) > 200:
+            x,y,w,h = boundingRect(cnt)
+            if w > h / 1.75:
+                name_boxes.append([x, y, x + w, y + h])
+                for i in range(w):
+                    for j in range(h):
+                        boxes_map[y + j, x + i] = 1
     _, thresh_boxes = threshold(boxes_map, 0, 255, 0)
     if not exists(join(model_output_dir, pred_boxed_masks_dir)):
         mkdir(join(model_output_dir, pred_boxed_masks_dir))
@@ -99,40 +135,11 @@ if __name__ == '__main__':
 
     saver.restore(sess, argv[1])
     print(">> Restored:", argv[1])
+
     files = listdir(join(data_dir, annotation_dir))
     validation_image = files[int(len(files) * 0.8):]
-
     for file in validation_image:
         infer_img(file)
-    # Print accuracy
     print("Validation accuracy:", num_matches / num_pixels)
 
-    """ input_batch_list, coordinate_batch_list, height, width = create_patch_batch_list(filename=argv[3], batch_size=2048)
-    logits_map = batch_logits_map_inference(input_tensor, logits, keep_probability, sess, is_training, input_batch_list, coordinate_batch_list, height, width)
-    pred_annotation_map = np.array(np.argmax(logits_map, axis=2), dtype=np.uint8)
-    _, thresh = threshold(pred_annotation_map, 0, 255, 0)
-    backtorgb = cv2.cvtColor(thresh, COLOR_GRAY2RGB)
-    _, contours, _ = findContours(thresh, RETR_EXTERNAL, 2)
-    for cnt in contours:
-        x,y,w,h = boundingRect(cnt)
-        rectangle(backtorgb, (x,y),(x+w,y+h),(0,255,0),1)
-        for i in range(w):
-            count_white = 0
-            for j in range(h):
-                if thresh[y + j, x + i] == 255:
-                    count_white += 1
-            if count_white / h <= CHOPPING_RATIO:
-                for j in range(h):
-                    thresh[y + j, x + i] = 0
-
-
-    imwrite(join('/home/minhnd', argv[3]), thresh)
-    imwrite(join('/home/minhnd', 'box_' + argv[3]), backtorgb)
-
-    _, contours, _ = findContours(thresh, RETR_EXTERNAL, 2)
-    backtorgb = cv2.cvtColor(thresh, COLOR_GRAY2RGB)
-    print(len(contours))
-    for cnt in contours:
-        x,y,w,h = boundingRect(cnt)
-        rectangle(backtorgb, (x,y),(x+w,y+h),(0,255,0),1)
-    imwrite(join('/home/minhnd', 'box_2_' + argv[3]), backtorgb) """
+    # infer_one_img(argv[3])

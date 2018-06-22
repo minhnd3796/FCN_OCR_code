@@ -32,7 +32,7 @@ def compare(preds, truth):
     hits = np.zeros(len(truth), dtype=int)
     for i, a in enumerate(truth):
         for b in preds:
-            if is_close(a, b):
+            if is_close(a, b, .8):
                 hits[i] += 1
     correct = (hits == 1).all() and len(preds) == len(truth)
     recall = (hits >= 1).all()
