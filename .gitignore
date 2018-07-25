@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 validation_name_boxes*/
 __pycache__/
 *.pyc
 wrong*
+=======
+__pycache__/*
+>>>>>>> d130256066d21ff68829da8fa67b774e6e079dc7
