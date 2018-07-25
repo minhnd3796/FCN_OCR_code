@@ -10,15 +10,17 @@ from os.path import exists, join
 import json
 
 IMAGE_SIZE = 32
-CHOPPING_RATIO = 0.5
+CHOPPING_RATIO = 0.4375
 data_dir = '../FCN_OCR_dataset'
 annotation_dir = 'annotations'
 input_dir = 'input_img'
 words_dir = 'located_words'
 pred_masks_dir = 'pred_masks'
 pred_boxed_masks_dir = 'pred_boxed_masks'
+output_json_dir = 'validation_name_boxes'
 num_matches = 0
 num_pixels = 0
+pad = 0
 
 def infer_one_img(file):
     input_img = imread('../FCN_OCR_dataset/input_img/' + file)
@@ -29,7 +31,7 @@ def infer_one_img(file):
     _, thresh = threshold(pred_annotation_map, 0, 255, 0)
     _, contours, _ = findContours(thresh, RETR_EXTERNAL, 2)
     for cnt in contours:
-        x,y,w,h = boundingRect(cnt)
+        x, y, w, h = boundingRect(cnt)
         for i in range(w):
             count_white = 0
             for j in range(h):
@@ -52,7 +54,7 @@ def infer_one_img(file):
     imshow('image', output_words)
     waitKey(0)
     destroyAllWindows() """
-    imwrite('/home/minhnd/Desktop/ditmemay.png', output_words)
+    imwrite('/home/minhnd/Desktop/hehe.png', output_words)
 
 def infer_img(file, model_output_dir=argv[1]):
     global num_matches
@@ -94,8 +96,16 @@ def infer_img(file, model_output_dir=argv[1]):
     for cnt in contours:
         if contourArea(cnt) > 200:
             x,y,w,h = boundingRect(cnt)
+            input_height, input_width, _ = input_img.shape
+            # x = max(0, x - pad)
+            y = max(0, y - pad)
+            # end_x = min(x + w + pad, input_width)
+            end_x = x + w
+            end_y = min(y + h + pad, input_height)
+            # w = end_x - x
+            h = end_y - y
             if w > h / 1.75:
-                name_boxes.append([x, y, x + w, y + h])
+                name_boxes.append([x, y, end_x, end_y])
                 for i in range(w):
                     for j in range(h):
                         boxes_map[y + j, x + i] = 1
@@ -105,7 +115,9 @@ def infer_img(file, model_output_dir=argv[1]):
     imwrite(join(model_output_dir, pred_boxed_masks_dir, file), thresh_boxes)
     json_dict['name_boxes'] = name_boxes
     print(json_dict)
-    with open(join('validation_name_boxes', json_name), 'w') as outfile:
+    if not exists(output_json_dir):
+        mkdir(output_json_dir)
+    with open(join(output_json_dir, json_name), 'w') as outfile:
         json.dump(json_dict, outfile)
 
     height = pred_annotation_map.shape[0]

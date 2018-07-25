@@ -7,7 +7,7 @@ from shutil import copy
 
 pred_dir = 'validation_name_boxes'
 gt_dir = '../processed/matched_json'
-cropped_dir = '../logs-FCN-OCR/model.ckpt-2/located_words/'
+cropped_dir = '../logs-FCN-OCR/model.ckpt-4/located_words/'
 full_img_with_boxes_dir = '../processed/matched_img/'
 wrong_img_correct_dir = 'wrong_images_correct'
 wrongly_cropped_correct_dir = 'wrongly_cropped_correct'

@@ -2,12 +2,10 @@ from cv2 import imread, imwrite
 import numpy as np
 from os.path import join, exists
 from os import mkdir, listdir
-from sys import argv
 from PIL import Image
 
-def create_patch_batch_list(filename,
+def create_patch_batch_list(input_img,
                             batch_size,
-                            data_dir=join('..', 'FCN_OCR_dataset'),
                             num_channels=3,
                             patch_size=32,
                             vertical_stride=16,
@@ -15,15 +13,13 @@ def create_patch_batch_list(filename,
     input_batch_list = []
     gt_annotation_batch_list = []
     coordinate_batch_list = []
-    top_dir = join(data_dir, 'input_img')
     global_patch_index = 0
 
-    top_img = imread(join(top_dir, filename))
-    height = top_img.shape[0]
-    width = top_img.shape[1]
-    num_vertical_points = (height - patch_size) // vertical_stride + 1
-    num_horizontial_points = (width - patch_size) // horizontal_stride + 1
-    input_img = top_img
+    height = input_img.shape[0]
+    width = input_img.shape[1]
+
+    num_vertical_points = int((height - patch_size) / vertical_stride) + 1
+    num_horizontial_points = int((width - patch_size) / horizontal_stride) + 1
     for i in range(num_vertical_points):
         for j in range(num_horizontial_points):
             local_patch_index = global_patch_index % batch_size
@@ -33,7 +29,8 @@ def create_patch_batch_list(filename,
                 current_coordinate_batch = [(None, None)] * batch_size
             current_coordinate_batch[local_patch_index] = (i * vertical_stride, j * horizontal_stride)
             current_input_batch[local_patch_index, :, :, :] = input_img[current_coordinate_batch[local_patch_index][0]:current_coordinate_batch[local_patch_index][0] + patch_size,
-                                                               current_coordinate_batch[local_patch_index][1]:current_coordinate_batch[local_patch_index][1] + patch_size,:]
+                                                              current_coordinate_batch[local_patch_index][1]:current_coordinate_batch[local_patch_index][1] + patch_size,:]
+
             if local_patch_index == batch_size - 1:
                 input_batch_list.append(current_input_batch)
                 gt_annotation_batch_list.append(current_gt_annotation_batch)
@@ -196,7 +193,7 @@ def get_patches(image_name, patch_size=32, vertical_stride=16, horizontal_stride
                                         current_coodinate[1]:current_coodinate[1] + patch_size,:]
         current_gt_patch = annotation_img[current_coodinate[0]:current_coodinate[0] + patch_size,
                                           current_coodinate[1]:current_coodinate[1] + patch_size]
-        coordinate.append(current_coodinate) 
+        coordinate.append(current_coodinate)
         gt_patch.append(current_gt_patch)
         input_patch.append(current_input_patch)
         num_patches += 1

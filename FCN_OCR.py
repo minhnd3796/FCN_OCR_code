@@ -11,7 +11,7 @@ from sys import argv
 from os.path import join
 
 FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_integer("batch_size", "2048", "batch size for training")
+tf.flags.DEFINE_integer("batch_size", "128", "batch size for training")
 tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR/", "path to logs directory")
 tf.flags.DEFINE_string("data_dir", "../FCN_OCR_dataset", "path to dataset")
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
