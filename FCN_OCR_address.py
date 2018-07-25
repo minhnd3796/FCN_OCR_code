@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from six.moves import xrange
 import datetime
-import Batch_manager_5channels as dataset
+import Batch_manager_addr as dataset
 import data_reader_5channels as reader
 import tensor_utils_5_channels as utils
 from sys import argv
@@ -12,8 +12,8 @@ from os.path import join
 
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_integer("batch_size", "2048", "batch size for training")
-tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR/", "path to logs directory")
-tf.flags.DEFINE_string("data_dir", "../FCN_OCR_dataset", "path to dataset")
+tf.flags.DEFINE_string("logs_dir", "../logs-FCN-OCR_address/", "path to logs directory")
+tf.flags.DEFINE_string("data_dir", "../FCN_OCR_address_dataset", "path to dataset")
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
 tf.flags.DEFINE_bool('debug', "False", "Debug mode: True/ False")
 tf.flags.DEFINE_string('mode', "train", "Mode train/ test/ visualize")
