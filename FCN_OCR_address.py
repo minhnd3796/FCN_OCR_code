@@ -54,6 +54,7 @@ def encoding_net(normalised_img, keep_prob, is_training):
 
     current = conv_bn_relu(current, 1, 1, 3, C_1, keep_prob, is_training)
     current = conv_bn_relu(current, 1, 2, C_1, C_1, keep_prob, is_training)
+    current = conv_bn_relu(current, 1, 3, C_1, C_1, keep_prob, is_training)
     current = tf.nn.max_pool(current, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
     net['pool1'] = current
 
